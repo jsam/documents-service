@@ -1,0 +1,90 @@
+{
+  "model_name": "DocLayout-YOLO-DocStructBench",
+  "version": "imgsz1280-2501",
+  "framework": "PyTorch",
+  "input_shape": [
+    1,
+    3,
+    1280,
+    1280
+  ],
+  "input_format": "NCHW",
+  "input_dtype": "float32",
+  "preprocessing": {
+    "normalize": true,
+    "mean": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "std": [
+      255.0,
+      255.0,
+      255.0
+    ],
+    "resize": 1280,
+    "description": "Images should be resized to square dimensions and normalized to [0, 1]"
+  },
+  "inference": {
+    "conf_threshold": 0.25,
+    "iou_threshold": 0.45,
+    "imgsz": 1280,
+    "device": "cpu"
+  },
+  "postprocessing": {
+    "nms": {
+      "enabled": true,
+      "iou_threshold": 0.45
+    },
+    "confidence_filtering": {
+      "enabled": true,
+      "threshold": 0.25
+    },
+    "output_format": {
+      "boxes": "xyxy",
+      "description": "Bounding boxes in [x_min, y_min, x_max, y_max] format"
+    }
+  },
+  "classes": {
+    "0": "title",
+    "1": "plain text",
+    "2": "abandon",
+    "3": "figure",
+    "4": "figure_caption",
+    "5": "table",
+    "6": "table_caption",
+    "7": "table_footnote",
+    "8": "isolate_formula",
+    "9": "formula_caption"
+  },
+  "num_classes": 10,
+  "task": "object_detection",
+  "domain": "document_layout_analysis",
+  "outputs": {
+    "boxes": {
+      "description": "Bounding boxes in xyxy format",
+      "shape": "(-1, 4)",
+      "dtype": "float32"
+    },
+    "scores": {
+      "description": "Confidence scores for each detection",
+      "shape": "(-1,)",
+      "dtype": "float32"
+    },
+    "classes": {
+      "description": "Class IDs for each detection",
+      "shape": "(-1,)",
+      "dtype": "int64"
+    }
+  },
+  "usage": {
+    "python_example": "\nimport torch\nimport numpy as np\nfrom PIL import Image\nimport torchvision.transforms as transforms\n\n# Load model\nmodel = torch.jit.load('doclayout_yolo_model.pt')\nmodel.eval()\n\n# Load and preprocess image\nimage = Image.open('document.jpg').convert('RGB')\nimage = image.resize((1280, 1280))\ntransform = transforms.Compose([\n    transforms.ToTensor(),\n])\ninput_tensor = transform(image).unsqueeze(0)\n\n# Inference\nwith torch.no_grad():\n    outputs = model(input_tensor)\n\n# Process outputs (extract boxes, scores, classes from model output)\n# Apply NMS and confidence thresholding as needed\n",
+    "notes": [
+      "Model expects RGB images resized to 1280x1280",
+      "Input should be normalized to [0, 1] range",
+      "Apply NMS with IOU threshold to remove duplicate detections",
+      "Filter detections by confidence threshold",
+      "Coordinates are in pixel space relative to input image size"
+    ]
+  }
+}

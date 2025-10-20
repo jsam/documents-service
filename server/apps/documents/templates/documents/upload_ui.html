@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Processing</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .upload-section {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: #fafafa;
+        }
+        .upload-section.dragover {
+            border-color: #4CAF50;
+            background: #f0f8f0;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .upload-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .upload-btn:hover {
+            background: #45a049;
+        }
+        .upload-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .job-info {
+            display: none;
+            padding: 20px;
+            background: #e8f5e9;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .job-id {
+            font-family: monospace;
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .progress-section {
+            display: none;
+        }
+        .step {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background: #f5f5f5;
+        }
+        .step.pending {
+            background: #fff3cd;
+        }
+        .step.in_progress {
+            background: #cce5ff;
+        }
+        .step.completed {
+            background: #d4edda;
+        }
+        .step.failed {
+            background: #f8d7da;
+        }
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .step-name {
+            font-weight: bold;
+        }
+        .step-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            background: white;
+        }
+        .progress-bar {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+        }
+        .error {
+            color: #d32f2f;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .results-section {
+            display: none;
+            margin-top: 20px;
+        }
+        .view-results-btn {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .view-results-btn:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Document Processing</h1>
+        
+        <div class="upload-section" id="uploadSection">
+            <p>Drag and drop a PDF file here, or click to select</p>
+            <input type="file" id="fileInput" accept=".pdf">
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Select PDF File
+            </button>
+            <button class="upload-btn" id="uploadBtn" style="display:none;" onclick="uploadFile()">
+                Upload & Process
+            </button>
+        </div>
+
+        <div class="job-info" id="jobInfo">
+            <strong>Job Created!</strong>
+            <div>Job ID: <span class="job-id" id="jobId"></span></div>
+        </div>
+
+        <div class="progress-section" id="progressSection">
+            <h2>Processing Status</h2>
+            <div id="stepsContainer"></div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <button class="view-results-btn" onclick="viewResults()">
+                View Results
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let pollInterval = null;
+        let selectedFile = null;
+
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type === 'application/pdf') {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            selectedFile = fileInput.files[0];
+            if (selectedFile) {
+                uploadBtn.style.display = 'inline-block';
+                uploadBtn.textContent = `Upload "${selectedFile.name}"`;
+            }
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) return;
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('/api/documents/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentJobId = data.job_id;
+                    document.getElementById('jobId').textContent = currentJobId;
+                    document.getElementById('jobInfo').style.display = 'block';
+                    document.getElementById('progressSection').style.display = 'block';
+                    uploadSection.style.display = 'none';
+                    
+                    startPolling();
+                } else {
+                    alert('Upload failed: ' + (data.detail || 'Unknown error'));
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = `Upload "${selectedFile.name}"`;
+                }
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = `Upload "${selectedFile.name}"`;
+            }
+        }
+
+        function startPolling() {
+            pollInterval = setInterval(fetchStatus, 1000);
+            fetchStatus();
+        }
+
+        async function fetchStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`/api/documents/${currentJobId}/status`);
+                const data = await response.json();
+
+                updateProgress(data);
+
+                if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+                    clearInterval(pollInterval);
+                    if (data.status === 'COMPLETED') {
+                        document.getElementById('resultsSection').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch status:', error);
+            }
+        }
+
+        function updateProgress(data) {
+            const container = document.getElementById('stepsContainer');
+            container.innerHTML = '';
+
+            data.steps.forEach(step => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = `step ${step.status.toLowerCase()}`;
+                
+                let statusText = step.status;
+                let progressBar = '';
+                
+                if (step.progress_total > 0) {
+                    progressBar = `
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${step.progress_percentage}%"></div>
+                        </div>
+                        <div style="font-size: 12px; margin-top: 5px;">
+                            ${step.progress_current} / ${step.progress_total} (${step.progress_percentage.toFixed(1)}%)
+                        </div>
+                    `;
+                }
+
+                let errorMsg = '';
+                if (step.error_message) {
+                    errorMsg = `<div class="error">${step.error_message}</div>`;
+                }
+
+                stepDiv.innerHTML = `
+                    <div class="step-header">
+                        <span class="step-name">${step.step_name}</span>
+                        <span class="step-status">${statusText}</span>
+                    </div>
+                    ${progressBar}
+                    ${errorMsg}
+                `;
+                
+                container.appendChild(stepDiv);
+            });
+        }
+
+        async function viewResults() {
+            if (!currentJobId) return;
+            
+            try {
+                const response = await fetch(`/api/documents/${currentJobId}/results`);
+                const data = await response.json();
+                
+                const resultsWindow = window.open('', '_blank');
+                resultsWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>Results - ${data.original_filename}</title>
+                        <style>
+                            body { font-family: monospace; padding: 20px; }
+                            pre { background: #f5f5f5; padding: 20px; border-radius: 4px; overflow: auto; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Results for ${data.original_filename}</h1>
+                        <p>Total Pages: ${data.total_pages}</p>
+                        <p>Total Elements: ${data.elements.length}</p>
+                        <h2>Full Data:</h2>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </body>
+                    </html>
+                `);
+                resultsWindow.document.close();
+            } catch (error) {
+                alert('Failed to fetch results: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

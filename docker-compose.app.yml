@@ -1,0 +1,142 @@
+version: "3.9"
+
+###############################################################################
+# Common build definition for all Django-based containers
+###############################################################################
+x-django-build: &django-build
+  context: .
+  dockerfile: ./docker/django/Dockerfile
+  target: development_build
+  args:
+    DJANGO_ENV: production
+
+x-django-service: &django-service
+  build: *django-build
+  # Mount the project source so /code/manage.py exists at runtime
+  volumes:
+    - .:/code
+    - python-venv:/code/.venv                # Keep venv separate from source mount
+    - django-static:/var/www/django/static   # collectstatic output
+    - ./logs:/var/log/django
+  working_dir: /code
+  env_file:
+    - ./config/.env.app
+  environment:
+    - PATH=/code/.venv/bin:/usr/local/bin:/usr/bin:/bin
+    - VIRTUAL_ENV=/code/.venv
+    - PYTHONDONTWRITEBYTECODE=1
+  networks: [web-net]
+
+###############################################################################
+# Services that run on *services-vm*
+###############################################################################
+services:
+  # ---- One-shot migrate job -----------------------------------------------
+  migrate:
+    <<: *django-service
+    entrypoint: []
+    command:
+      - sh
+      - -c
+      - |
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput &&
+        python manage.py init_minio &&
+        python manage.py create_superuser
+    restart: "no"
+
+  # ---- Django web server ---------------------------------------------------
+  web:
+    <<: *django-service
+    command: gunicorn --reload --config python:docker.django.gunicorn_config server.wsgi
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: /bin/sh /code/docker/django/healthcheck.sh
+      interval: 300s
+      timeout: 15s
+      retries: 5
+      start_period: 300s
+
+  # ---- Celery worker (general tasks) ---------------------------------------
+  celery:
+    <<: *django-service
+    command: celery -A server worker -l INFO -Q celery --concurrency=2
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # ---- Celery DocLayout ML worker (DocLayout-YOLO inference only) ---------
+  celery-doclayout-ml:
+    <<: *django-service
+    command: celery -A server worker -l INFO -Q ml_inference --concurrency=1 --prefetch-multiplier=1
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: celery -A server inspect ping -d celery@$$HOSTNAME
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ---- Celery POINTS ML worker (POINTS-Reader OCR only) --------------------
+  # IMPORTANT: POINTS OCR requires GPU/CUDA support
+  # The Qwen2VL vision encoder used by POINTS-Reader has known compatibility
+  # issues on CPU (position embeddings return None causing inference to fail).
+  # 
+  # For development/testing on macOS without CUDA:
+  #   - Comment out this service or set a profile to exclude it
+  #   - Other pipeline steps will work, but POINTS OCR step will be skipped
+  #
+  # For production with GPU:
+  #   - Set POINTS_USE_GPU=true
+  #   - Ensure Docker has GPU access (nvidia-docker runtime)
+  #   - Uncomment deploy.resources.reservations section below
+  celery-points-ml:
+    <<: *django-service
+    command: bash /code/docker/django/start_points_worker.sh
+    environment:
+      - POINTS_USE_GPU=true  # MUST be true - CPU not supported
+    # Uncomment for GPU reservations in production:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    #     limits:
+    #       memory: 8G
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: celery -A server inspect ping -d celery@$$HOSTNAME
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    profiles:
+      - with-gpu  # Only start with: docker-compose --profile with-gpu up
+
+  # ---- Celery beat (scheduler) --------------------------------------------
+  celery-beat:
+    <<: *django-service
+    command: celery -A server beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+###############################################################################
+# Shared Docker objects
+###############################################################################
+volumes:
+  django-static:
+  python-venv:
+
+networks:
+  web-net:

@@ -1,0 +1,97 @@
+version: "3.9"
+
+# ──────────────────────────
+# Common build definition for all Django-based services
+# ──────────────────────────
+x-web-build: &web-build
+  context: .
+  dockerfile: ./docker/django/Dockerfile
+  target: development_build          # keeps hot-reload extras
+  args:
+    DJANGO_ENV: development
+  cache_from:
+    - soxes-ai-template:dev          # optional cache hints
+    - soxes-ai-template:latest
+    - "*"
+
+# ──────────────────────────
+# Application stack (services-vm only)
+# ──────────────────────────
+services:
+  # --- One-shot migration job -----------------------------------------------
+  migrate:
+    build: *web-build
+    volumes:
+      - .:/code                       # gives the container your source tree
+      # Persist logs on the host to avoid missing /var/log/django
+      - ./logs:/var/log/django
+    env_file:
+      - ./config/.env.app
+    command: python /code/manage.py migrate --noinput
+    restart: "no"
+    networks: [web-net]
+
+  # --- Django web -----------------------------------------------------------
+  web:
+    build: *web-build
+    volumes:
+      - .:/code
+      - django-static:/var/www/django/static
+      - ./logs:/var/log/django
+    env_file:
+      - ./config/.env.app
+    # Override the DB host in case someone runs with a different .env
+    environment:
+      DJANGO_DATABASE_HOST: ${DJANGO_DATABASE_HOST:-74.161.152.43}
+    command: python /code/manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: /bin/sh /code/docker/django/healthcheck.sh
+      interval: 60s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [web-net]
+
+  # --- Celery worker --------------------------------------------------------
+  celery:
+    build: *web-build
+    volumes:
+      - .:/code
+      - ./logs:/var/log/django
+    env_file:
+      - ./config/.env.app
+    command: celery -A server worker -l INFO -Q ${CELERY_QUEUE:-celery}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [web-net]
+
+  # --- Celery beat scheduler -----------------------------------------------
+  celery-beat:
+    build: *web-build
+    volumes:
+      - .:/code
+      - ./logs:/var/log/django
+    env_file:
+      - ./config/.env.app
+    command: >
+      celery -A server beat -l INFO
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [web-net]
+
+# ──────────────────────────
+# Shared Docker objects
+# ──────────────────────────
+volumes:
+  django-static:
+
+networks:
+  web-net:
