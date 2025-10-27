@@ -36,7 +36,7 @@ ELEMENT_CLASSES = [
 ]
 
 
-def execute_step2(job_id: str, celery_task_id: str) -> dict:
+def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
     job = DocumentJob.objects.get(id=UUID(job_id))
     step = ProcessingStep.objects.get(job=job, step_name='ML_INFERENCE')
     

@@ -20,7 +20,6 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.conf.task_queues = (
     Queue('celery', routing_key='celery'),
     Queue('ml_inference', routing_key='ml_inference'),
-    Queue('ocr_processing', routing_key='ocr_processing'),
 )
 
 app.conf.task_default_queue = 'celery'
@@ -53,8 +52,7 @@ def init_worker_process(**kwargs):
     cmd_line = ' '.join(sys.argv)
     logger.info(f'[CELERY] Command line: {cmd_line}')
     
-    if 'ocr_processing' in cmd_line or '-Q ocr_processing' in cmd_line:
-        logger.info('[CELERY] Detected ocr_processing queue worker')
-        logger.info('[CELERY] DeepSeek-OCR model will load on first task execution')
+    if 'ml_inference' in cmd_line or '-Q ml_inference' in cmd_line:
+        logger.info('[CELERY] Detected ml_inference queue worker')
     else:
-        logger.info('[CELERY] This worker does not handle ocr_processing queue')
+        logger.info('[CELERY] This worker does not handle ml_inference queue')

@@ -27,7 +27,7 @@ ELEMENT_COLORS = {
 }
 
 
-def execute_step3(job_id: str, celery_task_id: str) -> dict:
+def execute_draw_bounding_boxes(job_id: str, celery_task_id: str) -> dict:
     job = DocumentJob.objects.get(id=UUID(job_id))
     step = ProcessingStep.objects.get(job=job, step_name='DRAW_BOUNDING_BOXES')
     

@@ -5,10 +5,10 @@ from django.utils import timezone
 
 from server.apps.documents.models import DocumentJob, ProcessingStep
 from server.apps.documents.utils.minio_client import upload_file
-from server.apps.documents.utils.storage import get_step5_graph_path
+from server.apps.documents.utils.storage import get_graph_path
 
 
-def execute_step5(job_id: str, celery_task_id: str) -> dict:
+def execute_assemble_graph(job_id: str, celery_task_id: str) -> dict:
     job = DocumentJob.objects.get(id=UUID(job_id))
     step = ProcessingStep.objects.get(job=job, step_name='ASSEMBLE_GRAPH')
     
@@ -55,7 +55,7 @@ def execute_step5(job_id: str, celery_task_id: str) -> dict:
         job.document_graph = document_graph
         job.save(update_fields=['document_graph'])
         
-        graph_path = get_step5_graph_path(job.id)
+        graph_path = get_graph_path(job.id)
         graph_json = json.dumps(document_graph, indent=2).encode('utf-8')
         
         upload_file(

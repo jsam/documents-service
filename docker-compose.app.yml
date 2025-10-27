@@ -1,4 +1,3 @@
-version: "3.9"
 
 ###############################################################################
 # Common build definition for all Django-based containers
@@ -26,6 +25,8 @@ x-django-service: &django-service
     - VIRTUAL_ENV=/code/.venv
     - PYTHONDONTWRITEBYTECODE=1
   networks: [web-net]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
 ###############################################################################
 # Services that run on *services-vm*
@@ -73,39 +74,6 @@ services:
   celery-doclayout-ml:
     <<: *django-service
     command: celery -A server worker -l INFO -Q ml_inference --concurrency=1 --prefetch-multiplier=1
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    healthcheck:
-      test: celery -A server inspect ping -d celery@$$HOSTNAME
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ---- Celery DeepSeek OCR worker (DeepSeek-OCR processing only) -------------
-  # IMPORTANT: DeepSeek-OCR requires GPU/CUDA support
-  # The model requires CUDA and will fail if GPU is not available.
-  # 
-  # For development/testing on macOS without CUDA:
-  #   - Comment out this service
-  #   - Other pipeline steps will work, but OCR step will fail
-  #
-  # OCR processing worker with GPU support
-  ocr-worker:
-    <<: *django-service
-    command: bash /code/docker/django/start_ocr_worker.sh
-    environment:
-      - DEEPSEEK_USE_GPU=true  # DeepSeek-OCR requires GPU
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-        limits:
-          memory: 8G
     depends_on:
       migrate:
         condition: service_completed_successfully

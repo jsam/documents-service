@@ -42,7 +42,7 @@ def extract_text_from_region(image: Image.Image) -> str:
         return ''
 
 
-def execute_step4(job_id: str, celery_task_id: str) -> dict:
+def execute_text_extraction(job_id: str, celery_task_id: str) -> dict:
     job = DocumentJob.objects.get(id=UUID(job_id))
     step = ProcessingStep.objects.get(job=job, step_name='TEXT_EXTRACTION')
     

@@ -1,9 +1,12 @@
+import logging
 from uuid import UUID
 
 from celery import chain, chord, group, shared_task
 from django.utils import timezone
 
 from server.apps.documents.models import DocumentJob, ProcessingStep
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -16,55 +19,64 @@ def process_document_pipeline(self, job_id: str):
     job.save(update_fields=['status', 'processing_started_at', 'celery_task_id'])
     
     ml_chain = chain(
-        step2_ml_inference.s(job_id),
-        step3_draw_bounding_boxes.s(job_id),
-        step4_text_extraction.s(job_id),
+        ml_inference.s(job_id),
+        draw_bounding_boxes.s(job_id),
+        text_extraction.s(job_id),
     )
     
-    ocr_task = step6_ocr_processing.s(job_id)
+    ocr_task = ocr_processing.si(job_id)
+    
+    logger.info(f'[PIPELINE] Building pipeline for job {job_id}')
+    logger.info(f'[PIPELINE] ML chain: {ml_chain}')
+    logger.info(f'[PIPELINE] OCR task: {ocr_task}')
     
     task_pipeline = chain(
-        step1_pdf_to_images.s(job_id),
+        pdf_to_images.s(job_id),
         chord(
             group(ml_chain, ocr_task),
-            step5_assemble_graph.s(job_id)
-        )
+            assemble_graph.s(job_id),
+        ),
     )
+    
+    logger.info(f'[PIPELINE] Final pipeline: {task_pipeline}')
     
     return task_pipeline.apply_async()
 
 
 @shared_task(bind=True, max_retries=3)
-def step1_pdf_to_images(self, job_id: str):
-    from server.apps.documents.tasks.step1_pdf_to_images import execute_step1
-    return execute_step1(job_id, self.request.id)
+def pdf_to_images(self, job_id: str):
+    from server.apps.documents.tasks.pdf_to_images import execute_pdf_to_images
+    return execute_pdf_to_images(job_id, self.request.id)
 
 
 @shared_task(bind=True, max_retries=3, queue='ml_inference')
-def step2_ml_inference(self, previous_result, job_id: str):
-    from server.apps.documents.tasks.step2_ml_inference import execute_step2
-    return execute_step2(job_id, self.request.id)
+def ml_inference(self, previous_result, job_id: str):
+    from server.apps.documents.tasks.ml_inference import execute_ml_inference
+    return execute_ml_inference(job_id, self.request.id)
 
 
 @shared_task(bind=True, max_retries=3)
-def step3_draw_bounding_boxes(self, previous_result, job_id: str):
-    from server.apps.documents.tasks.step3_draw_bounding_boxes import execute_step3
-    return execute_step3(job_id, self.request.id)
+def draw_bounding_boxes(self, previous_result, job_id: str):
+    from server.apps.documents.tasks.draw_bounding_boxes import execute_draw_bounding_boxes
+    return execute_draw_bounding_boxes(job_id, self.request.id)
 
 
 @shared_task(bind=True, max_retries=3)
-def step4_text_extraction(self, previous_result, job_id: str):
-    from server.apps.documents.tasks.step4_text_extraction import execute_step4
-    return execute_step4(job_id, self.request.id)
-
-
-@shared_task(bind=True, max_retries=3, queue='ocr_processing')
-def step6_ocr_processing(self, previous_result, job_id: str):
-    from server.apps.documents.tasks.step6_ocr_processing import execute_step6
-    return execute_step6(job_id, self.request.id)
+def text_extraction(self, previous_result, job_id: str):
+    from server.apps.documents.tasks.text_extraction import execute_text_extraction
+    return execute_text_extraction(job_id, self.request.id)
 
 
 @shared_task(bind=True, max_retries=3)
-def step5_assemble_graph(self, previous_result, job_id: str):
-    from server.apps.documents.tasks.step5_assemble_graph import execute_step5
-    return execute_step5(job_id, self.request.id)
+def ocr_processing(self, job_id: str):
+    logger.info(f'[PIPELINE] ocr_processing STARTED for job {job_id}')
+    from server.apps.documents.tasks.ocr_processing import execute_ocr_processing
+    result = execute_ocr_processing(job_id, self.request.id)
+    logger.info(f'[PIPELINE] ocr_processing COMPLETED for job {job_id}')
+    return result
+
+
+@shared_task(bind=True, max_retries=3)
+def assemble_graph(self, previous_result, job_id: str):
+    from server.apps.documents.tasks.assemble_graph import execute_assemble_graph
+    return execute_assemble_graph(job_id, self.request.id)

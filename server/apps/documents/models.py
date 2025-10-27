@@ -366,7 +366,7 @@ class DocumentElement(models.Model):
         max_length=500,
         null=True,
         blank=True,
-        help_text='Reference to cropped region image in step4',
+        help_text='Reference to cropped region image in text_extraction task',
     )
 
     # Ordering

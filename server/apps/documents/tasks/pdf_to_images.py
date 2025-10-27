@@ -11,7 +11,7 @@ from server.apps.documents.utils.minio_client import download_file, upload_file
 from server.apps.documents.utils.storage import get_page_image_path
 
 
-def execute_step1(job_id: str, celery_task_id: str) -> dict:
+def execute_pdf_to_images(job_id: str, celery_task_id: str) -> dict:
     job = DocumentJob.objects.get(id=UUID(job_id))
     step = ProcessingStep.objects.get(job=job, step_name='PDF_TO_IMAGES')
     
