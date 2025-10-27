@@ -6,6 +6,13 @@ build-backend = "hatchling.build"
 [tool.uv]
 package = false
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
+
 
 [project]
 name = "documents-service"
@@ -41,11 +48,14 @@ dependencies = [
     "magic-pdf>=0.7.0",
     "easyocr>=1.7.0",
     "doclayout-yolo>=0.0.4",
-    "transformers>=4.35.0",
-    "qwen-vl-utils>=0.0.8",
+    "transformers==4.46.3",
+    "tokenizers==0.20.3",
     "accelerate>=0.20.0",
     "dill>=0.4.0",
-    "wepoints @ git+https://github.com/WePOINTS/WePOINTS.git",
+    "einops>=0.8.0",
+    "easydict>=1.10",
+    "addict>=2.4.0",
+    "img2pdf>=0.5.0",
 ]
 
 

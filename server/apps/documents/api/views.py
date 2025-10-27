@@ -55,7 +55,7 @@ def upload_document(request, file: UploadedFile = File(...)):
         job.mark_failed(str(e), 'UPLOAD')
         return 400, {'detail': f'Failed to upload file to storage: {e}'}
     
-    for idx, step_name in enumerate(['UPLOAD', 'PDF_TO_IMAGES', 'ML_INFERENCE', 'DRAW_BOUNDING_BOXES', 'TEXT_EXTRACTION', 'POINTS_OCR', 'ASSEMBLE_GRAPH']):
+    for idx, step_name in enumerate(['UPLOAD', 'PDF_TO_IMAGES', 'ML_INFERENCE', 'DRAW_BOUNDING_BOXES', 'TEXT_EXTRACTION', 'OCR_PROCESSING', 'ASSEMBLE_GRAPH']):
         ProcessingStep.objects.create(
             job=job,
             step_name=step_name,

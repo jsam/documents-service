@@ -20,7 +20,7 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.conf.task_queues = (
     Queue('celery', routing_key='celery'),
     Queue('ml_inference', routing_key='ml_inference'),
-    Queue('points_ocr', routing_key='points_ocr'),
+    Queue('ocr_processing', routing_key='ocr_processing'),
 )
 
 app.conf.task_default_queue = 'celery'
@@ -53,8 +53,8 @@ def init_worker_process(**kwargs):
     cmd_line = ' '.join(sys.argv)
     logger.info(f'[CELERY] Command line: {cmd_line}')
     
-    if 'points_ocr' in cmd_line or '-Q points_ocr' in cmd_line:
-        logger.info('[CELERY] Detected points_ocr queue worker')
-        logger.warning('[CELERY] POINTS model will load on first task execution due to flash-attn requirement')
+    if 'ocr_processing' in cmd_line or '-Q ocr_processing' in cmd_line:
+        logger.info('[CELERY] Detected ocr_processing queue worker')
+        logger.info('[CELERY] DeepSeek-OCR model will load on first task execution')
     else:
-        logger.info('[CELERY] This worker does not handle points_ocr queue')
+        logger.info('[CELERY] This worker does not handle ocr_processing queue')

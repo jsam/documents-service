@@ -58,6 +58,7 @@ def upload_file(
 def download_file(bucket: str, object_name: str) -> bytes:
     client = get_minio_client()
     
+    response = None
     try:
         response = client.get_object(bucket, object_name)
         data = response.read()
@@ -65,8 +66,9 @@ def download_file(bucket: str, object_name: str) -> bytes:
     except S3Error as e:
         raise RuntimeError(f'Failed to download {object_name} from {bucket}: {e}') from e
     finally:
-        response.close()
-        response.release_conn()
+        if response:
+            response.close()
+            response.release_conn()
 
 
 def delete_file(bucket: str, object_name: str) -> None:

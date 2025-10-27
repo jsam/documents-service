@@ -71,6 +71,22 @@ services:
         condition: service_completed_successfully
     networks: [web-net]
 
+  # --- OCR processing worker -----------------------------------------------
+  ocr-worker:
+    build: *web-build
+    volumes:
+      - .:/code
+      - ./logs:/var/log/django
+    env_file:
+      - ./config/.env.app
+    environment:
+      DEEPSEEK_USE_GPU: "true"
+    command: celery -A server worker -l INFO -Q ocr_processing --concurrency=1 --prefetch-multiplier=1
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [web-net]
+
   # --- Celery beat scheduler -----------------------------------------------
   celery-beat:
     build: *web-build

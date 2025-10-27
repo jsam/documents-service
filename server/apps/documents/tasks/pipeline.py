@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from celery import chain, shared_task
+from celery import chain, chord, group, shared_task
 from django.utils import timezone
 
 from server.apps.documents.models import DocumentJob, ProcessingStep
@@ -15,16 +15,23 @@ def process_document_pipeline(self, job_id: str):
     job.celery_task_id = self.request.id
     job.save(update_fields=['status', 'processing_started_at', 'celery_task_id'])
     
-    task_chain = chain(
-        step1_pdf_to_images.s(job_id),
+    ml_chain = chain(
         step2_ml_inference.s(job_id),
         step3_draw_bounding_boxes.s(job_id),
         step4_text_extraction.s(job_id),
-        step6_points_ocr.s(job_id),
-        step5_assemble_graph.s(job_id),
     )
     
-    return task_chain.apply_async()
+    ocr_task = step6_ocr_processing.s(job_id)
+    
+    task_pipeline = chain(
+        step1_pdf_to_images.s(job_id),
+        chord(
+            group(ml_chain, ocr_task),
+            step5_assemble_graph.s(job_id)
+        )
+    )
+    
+    return task_pipeline.apply_async()
 
 
 @shared_task(bind=True, max_retries=3)
@@ -51,9 +58,9 @@ def step4_text_extraction(self, previous_result, job_id: str):
     return execute_step4(job_id, self.request.id)
 
 
-@shared_task(bind=True, max_retries=3, queue='points_ocr')
-def step6_points_ocr(self, previous_result, job_id: str):
-    from server.apps.documents.tasks.step6_points_ocr import execute_step6
+@shared_task(bind=True, max_retries=3, queue='ocr_processing')
+def step6_ocr_processing(self, previous_result, job_id: str):
+    from server.apps.documents.tasks.step6_ocr_processing import execute_step6
     return execute_step6(job_id, self.request.id)
 
 

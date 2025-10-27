@@ -83,34 +83,29 @@ services:
       retries: 3
       start_period: 30s
 
-  # ---- Celery POINTS ML worker (POINTS-Reader OCR only) --------------------
-  # IMPORTANT: POINTS OCR requires GPU/CUDA support
-  # The Qwen2VL vision encoder used by POINTS-Reader has known compatibility
-  # issues on CPU (position embeddings return None causing inference to fail).
+  # ---- Celery DeepSeek OCR worker (DeepSeek-OCR processing only) -------------
+  # IMPORTANT: DeepSeek-OCR requires GPU/CUDA support
+  # The model requires CUDA and will fail if GPU is not available.
   # 
   # For development/testing on macOS without CUDA:
-  #   - Comment out this service or set a profile to exclude it
-  #   - Other pipeline steps will work, but POINTS OCR step will be skipped
+  #   - Comment out this service
+  #   - Other pipeline steps will work, but OCR step will fail
   #
-  # For production with GPU:
-  #   - Set POINTS_USE_GPU=true
-  #   - Ensure Docker has GPU access (nvidia-docker runtime)
-  #   - Uncomment deploy.resources.reservations section below
-  celery-points-ml:
+  # OCR processing worker with GPU support
+  ocr-worker:
     <<: *django-service
-    command: bash /code/docker/django/start_points_worker.sh
+    command: bash /code/docker/django/start_ocr_worker.sh
     environment:
-      - POINTS_USE_GPU=true  # MUST be true - CPU not supported
-    # Uncomment for GPU reservations in production:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-    #     limits:
-    #       memory: 8G
+      - DEEPSEEK_USE_GPU=true  # DeepSeek-OCR requires GPU
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 8G
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -120,8 +115,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    profiles:
-      - with-gpu  # Only start with: docker-compose --profile with-gpu up
 
   # ---- Celery beat (scheduler) --------------------------------------------
   celery-beat:
