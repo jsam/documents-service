@@ -70,10 +70,10 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # ---- Celery DocLayout ML worker (DocLayout-YOLO inference only) ---------
-  celery-doclayout-ml:
+  # ---- Celery Page Segmentation worker (DocLayout-YOLO inference only) ----
+  celery-page-segmentation:
     <<: *django-service
-    command: celery -A server worker -l INFO -Q ml_inference --concurrency=1 --prefetch-multiplier=1
+    command: celery -A server worker -l INFO -Q page_segmentation --concurrency=1 --prefetch-multiplier=1
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -84,6 +84,27 @@ services:
       retries: 3
       start_period: 30s
 
+  # ---- Celery olmOCR-2 worker (table extraction only) ---------------------
+  celery-olmocr2-ml:
+    <<: *django-service
+    command: celery -A server worker -l INFO -Q table_extraction --concurrency=1 --prefetch-multiplier=1
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: celery -A server inspect ping -d celery@$$HOSTNAME
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   # ---- Celery beat (scheduler) --------------------------------------------
   celery-beat:
     <<: *django-service
@@ -91,6 +112,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
 
 ###############################################################################
 # Shared Docker objects

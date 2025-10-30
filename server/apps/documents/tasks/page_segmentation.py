@@ -36,21 +36,21 @@ ELEMENT_CLASSES = [
 ]
 
 
-def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
+def execute_page_segmentation(job_id: str, celery_task_id: str) -> dict:
     job = DocumentJob.objects.get(id=UUID(job_id))
-    step = ProcessingStep.objects.get(job=job, step_name='ML_INFERENCE')
+    step = ProcessingStep.objects.get(job=job, step_name='PAGE_SEGMENTATION')
     
     step.mark_in_progress(celery_task_id)
-    job.current_step = 'ML_INFERENCE'
+    job.current_step = 'PAGE_SEGMENTATION'
     job.save(update_fields=['current_step'])
     
     try:
-        logger.info(f'[ML] Loading model for job {job_id}')
+        logger.info(f'[PAGE_SEGMENTATION] Loading model for job {job_id}')
         model = load_doclayout_model()
         conf_threshold = get_confidence_threshold()
         iou_threshold = get_iou_threshold()
         
-        logger.info(f'[ML] Model loaded. Conf threshold: {conf_threshold}, IOU: {iou_threshold}')
+        logger.info(f'[PAGE_SEGMENTATION] Model loaded. Conf threshold: {conf_threshold}, IOU: {iou_threshold}')
         
         total_pages = job.total_pages
         step.update_progress(0, total_pages)
@@ -58,14 +58,14 @@ def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
         all_detections = []
         
         for page_num in range(1, total_pages + 1):
-            logger.info(f'[ML] Processing page {page_num}/{total_pages} for job {job_id}')
+            logger.info(f'[PAGE_SEGMENTATION] Processing page {page_num}/{total_pages} for job {job_id}')
             
             image_path = get_page_image_path(job.id, page_num)
             image_bytes = download_file(job.minio_bucket, image_path)
             
             image = Image.open(BytesIO(image_bytes)).convert('RGB')
             original_width, original_height = image.size
-            logger.info(f'[ML] Original image size: {original_width}x{original_height}')
+            logger.info(f'[PAGE_SEGMENTATION] Original image size: {original_width}x{original_height}')
             
             det_res = model.predict(
                 image,
@@ -78,7 +78,7 @@ def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
             classes = det_res.__dict__['boxes'].cls
             scores = det_res.__dict__['boxes'].conf
             
-            logger.info(f'[ML] Raw detections: {len(boxes)} boxes')
+            logger.info(f'[PAGE_SEGMENTATION] Raw detections: {len(boxes)} boxes')
             
             import torchvision
             if len(boxes) > 0:
@@ -87,7 +87,7 @@ def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
                 scores = scores[indices]
                 classes = classes[indices]
                 
-                logger.info(f'[ML] After NMS: {len(boxes)} boxes')
+                logger.info(f'[PAGE_SEGMENTATION] After NMS: {len(boxes)} boxes')
             
             page_detections = []
             for i in range(len(boxes)):
@@ -101,7 +101,7 @@ def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
                 y2 = float(box[3])
                 
                 if x2 <= x1 or y2 <= y1:
-                    logger.warning(f'[ML] Invalid box: x1={x1}, y1={y1}, x2={x2}, y2={y2}')
+                    logger.warning(f'[PAGE_SEGMENTATION] Invalid box: x1={x1}, y1={y1}, x2={x2}, y2={y2}')
                     continue
                 
                 x1 = max(0, min(x1, original_width))
@@ -128,7 +128,7 @@ def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
                 }
                 page_detections.append(detection)
             
-            logger.info(f'[ML] Page {page_num}: {len(page_detections)} final detections')
+            logger.info(f'[PAGE_SEGMENTATION] Page {page_num}: {len(page_detections)} final detections')
             
             detection_data = {
                 'page_number': page_num,
@@ -164,6 +164,6 @@ def execute_ml_inference(job_id: str, celery_task_id: str) -> dict:
         step.retry_count += 1
         step.save(update_fields=['status', 'error_message', 'retry_count'])
         
-        job.mark_failed(str(e), 'ML_INFERENCE')
+        job.mark_failed(str(e), 'PAGE_SEGMENTATION')
         
         raise

@@ -58,6 +58,8 @@ dependencies = [
     "img2pdf>=0.5.0",
     "httpx>=0.24.0",
     "openai>=1.0.0",
+    "requests>=2.31.0",
+    "qwen-vl-utils>=0.0.8",
 ]
 
 

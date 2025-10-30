@@ -51,6 +51,8 @@ class DocumentElement(Schema):
     element_type: str
     confidence: float
     extracted_text: str | None
+    table_html: str | None
+    table_data: list[list[str]] | None
     sequence: int
     minio_image_key: str | None
 

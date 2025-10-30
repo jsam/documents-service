@@ -18,24 +18,14 @@ def process_document_pipeline(self, job_id: str):
     job.celery_task_id = self.request.id
     job.save(update_fields=['status', 'processing_started_at', 'celery_task_id'])
     
-    ml_chain = chain(
-        ml_inference.s(job_id),
-        draw_bounding_boxes.s(job_id),
-        text_extraction.s(job_id),
-    )
-    
-    ocr_task = ocr_processing.si(job_id)
-    
     logger.info(f'[PIPELINE] Building pipeline for job {job_id}')
-    logger.info(f'[PIPELINE] ML chain: {ml_chain}')
-    logger.info(f'[PIPELINE] OCR task: {ocr_task}')
     
     task_pipeline = chain(
         pdf_to_images.s(job_id),
-        chord(
-            group(ml_chain, ocr_task),
-            assemble_graph.s(job_id),
-        ),
+        page_segmentation.s(job_id),
+        draw_bounding_boxes.s(job_id),
+        text_extraction.s(job_id),
+        assemble_graph.s(job_id),
     )
     
     logger.info(f'[PIPELINE] Final pipeline: {task_pipeline}')
@@ -49,10 +39,10 @@ def pdf_to_images(self, job_id: str):
     return execute_pdf_to_images(job_id, self.request.id)
 
 
-@shared_task(bind=True, max_retries=3, queue='ml_inference')
-def ml_inference(self, previous_result, job_id: str):
-    from server.apps.documents.tasks.ml_inference import execute_ml_inference
-    return execute_ml_inference(job_id, self.request.id)
+@shared_task(bind=True, max_retries=3, queue='page_segmentation')
+def page_segmentation(self, previous_result, job_id: str):
+    from server.apps.documents.tasks.page_segmentation import execute_page_segmentation
+    return execute_page_segmentation(job_id, self.request.id)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -61,19 +51,10 @@ def draw_bounding_boxes(self, previous_result, job_id: str):
     return execute_draw_bounding_boxes(job_id, self.request.id)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, max_retries=3, queue='table_extraction')
 def text_extraction(self, previous_result, job_id: str):
     from server.apps.documents.tasks.text_extraction import execute_text_extraction
     return execute_text_extraction(job_id, self.request.id)
-
-
-@shared_task(bind=True, max_retries=3)
-def ocr_processing(self, job_id: str):
-    logger.info(f'[PIPELINE] ocr_processing STARTED for job {job_id}')
-    from server.apps.documents.tasks.ocr_processing import execute_ocr_processing
-    result = execute_ocr_processing(job_id, self.request.id)
-    logger.info(f'[PIPELINE] ocr_processing COMPLETED for job {job_id}')
-    return result
 
 
 @shared_task(bind=True, max_retries=3)

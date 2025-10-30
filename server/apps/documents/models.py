@@ -21,19 +21,17 @@ class DocumentJob(models.Model):
 
     STEP_UPLOAD = 'UPLOAD'
     STEP_PDF_TO_IMAGES = 'PDF_TO_IMAGES'
-    STEP_ML_INFERENCE = 'ML_INFERENCE'
+    STEP_PAGE_SEGMENTATION = 'PAGE_SEGMENTATION'
     STEP_DRAW_BOUNDING_BOXES = 'DRAW_BOUNDING_BOXES'
     STEP_TEXT_EXTRACTION = 'TEXT_EXTRACTION'
-    STEP_OCR_PROCESSING = 'OCR_PROCESSING'
     STEP_ASSEMBLE_GRAPH = 'ASSEMBLE_GRAPH'
 
     STEP_CHOICES = [
         (STEP_UPLOAD, 'Upload'),
         (STEP_PDF_TO_IMAGES, 'PDF to Images'),
-        (STEP_ML_INFERENCE, 'ML Inference'),
+        (STEP_PAGE_SEGMENTATION, 'Page Segmentation'),
         (STEP_DRAW_BOUNDING_BOXES, 'Draw Bounding Boxes'),
         (STEP_TEXT_EXTRACTION, 'Text Extraction'),
-        (STEP_OCR_PROCESSING, 'OCR Processing'),
         (STEP_ASSEMBLE_GRAPH, 'Assemble Graph'),
     ]
 
@@ -155,8 +153,7 @@ class ProcessingStep(models.Model):
     # Step names match DocumentJob.STEP_* constants
     STEP_UPLOAD = 'UPLOAD'
     STEP_PDF_TO_IMAGES = 'PDF_TO_IMAGES'
-    STEP_OCR_PROCESSING = 'OCR_PROCESSING'
-    STEP_ML_INFERENCE = 'ML_INFERENCE'
+    STEP_PAGE_SEGMENTATION = 'PAGE_SEGMENTATION'
     STEP_DRAW_BOUNDING_BOXES = 'DRAW_BOUNDING_BOXES'
     STEP_TEXT_EXTRACTION = 'TEXT_EXTRACTION'
     STEP_ASSEMBLE_GRAPH = 'ASSEMBLE_GRAPH'
@@ -164,8 +161,7 @@ class ProcessingStep(models.Model):
     STEP_CHOICES = [
         (STEP_UPLOAD, 'Upload'),
         (STEP_PDF_TO_IMAGES, 'PDF to Images'),
-        (STEP_OCR_PROCESSING, 'OCR Processing'),
-        (STEP_ML_INFERENCE, 'ML Inference'),
+        (STEP_PAGE_SEGMENTATION, 'Page Segmentation'),
         (STEP_DRAW_BOUNDING_BOXES, 'Draw Bounding Boxes'),
         (STEP_TEXT_EXTRACTION, 'Text Extraction'),
         (STEP_ASSEMBLE_GRAPH, 'Assemble Graph'),
@@ -360,6 +356,18 @@ class DocumentElement(models.Model):
 
     # Content
     extracted_text = models.TextField(null=True, blank=True)
+    
+    # Structured table data
+    table_html = models.TextField(
+        null=True,
+        blank=True,
+        help_text='HTML representation of table structure (for table elements)',
+    )
+    table_data = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Structured table data as 2D array (for table elements)',
+    )
 
     # MinIO references
     minio_image_key = models.CharField(
