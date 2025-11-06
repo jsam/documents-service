@@ -49,7 +49,7 @@ dependencies = [
     "magic-pdf>=0.7.0",
     "easyocr>=1.7.0",
     "doclayout-yolo>=0.0.4",
-    "transformers==4.46.3",
+    "transformers==4.53.0",
     "tokenizers==0.20.3",
     "accelerate>=0.20.0",
     "dill>=0.4.0",
