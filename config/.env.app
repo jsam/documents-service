@@ -63,3 +63,8 @@ MINIO_SECRET_KEY=minioadmin
 MINIO_USE_SSL=False
 MINIO_BUCKET_NAME=document-processing
 ML_MODEL_PATH=/code/mlmodels/doclayout_yolo.mlpkg/doclayout_yolo_model.pt
+
+
+# ML Device settings
+ML_DEVICE=cuda
+OLMOCR_DEVICE=cuda

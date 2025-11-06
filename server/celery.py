@@ -19,8 +19,8 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Define task queues
 app.conf.task_queues = (
     Queue('celery', routing_key='celery'),
-    Queue('ml_inference', routing_key='ml_inference'),
-    Queue('points_ocr', routing_key='points_ocr'),
+    Queue('page_segmentation', routing_key='page_segmentation'),
+    Queue('table_extraction', routing_key='table_extraction'),
 )
 
 app.conf.task_default_queue = 'celery'
@@ -53,8 +53,18 @@ def init_worker_process(**kwargs):
     cmd_line = ' '.join(sys.argv)
     logger.info(f'[CELERY] Command line: {cmd_line}')
     
-    if 'points_ocr' in cmd_line or '-Q points_ocr' in cmd_line:
-        logger.info('[CELERY] Detected points_ocr queue worker')
-        logger.warning('[CELERY] POINTS model will load on first task execution due to flash-attn requirement')
+    if 'page_segmentation' in cmd_line or '-Q page_segmentation' in cmd_line:
+        logger.info('[CELERY] Detected page_segmentation queue worker')
+    elif 'table_extraction' in cmd_line or '-Q table_extraction' in cmd_line:
+        logger.info('[CELERY] Detected table_extraction queue worker - loading olmOCR model in worker process')
+        try:
+            from server.apps.documents.tasks import text_extraction
+            from server.apps.documents.utils.model_loader import load_olmocr_model
+            
+            logger.info('[CELERY] Loading olmOCR model into worker process global variable')
+            text_extraction._olmocr_model, text_extraction._olmocr_processor = load_olmocr_model()
+            logger.info('[CELERY] ✓ olmOCR model loaded in worker process')
+        except Exception as e:
+            logger.error(f'[CELERY] ✗ Failed to load olmOCR in worker process: {e}', exc_info=True)
     else:
-        logger.info('[CELERY] This worker does not handle points_ocr queue')
+        logger.info('[CELERY] This worker does not handle page_segmentation or table_extraction queue')

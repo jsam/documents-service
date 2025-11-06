@@ -1,4 +1,3 @@
-version: "3.9"
 
 ###############################################################################
 # Common build definition for all Django-based containers
@@ -26,6 +25,8 @@ x-django-service: &django-service
     - VIRTUAL_ENV=/code/.venv
     - PYTHONDONTWRITEBYTECODE=1
   networks: [web-net]
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
 ###############################################################################
 # Services that run on *services-vm*
@@ -69,10 +70,10 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # ---- Celery DocLayout ML worker (DocLayout-YOLO inference only) ---------
-  celery-doclayout-ml:
+  # ---- Celery Page Segmentation worker (DocLayout-YOLO inference only) ----
+  celery-page-segmentation:
     <<: *django-service
-    command: celery -A server worker -l INFO -Q ml_inference --concurrency=1 --prefetch-multiplier=1
+    command: celery -A server worker -l INFO -Q page_segmentation --concurrency=1 --prefetch-multiplier=1
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -83,34 +84,10 @@ services:
       retries: 3
       start_period: 30s
 
-  # ---- Celery POINTS ML worker (POINTS-Reader OCR only) --------------------
-  # IMPORTANT: POINTS OCR requires GPU/CUDA support
-  # The Qwen2VL vision encoder used by POINTS-Reader has known compatibility
-  # issues on CPU (position embeddings return None causing inference to fail).
-  # 
-  # For development/testing on macOS without CUDA:
-  #   - Comment out this service or set a profile to exclude it
-  #   - Other pipeline steps will work, but POINTS OCR step will be skipped
-  #
-  # For production with GPU:
-  #   - Set POINTS_USE_GPU=true
-  #   - Ensure Docker has GPU access (nvidia-docker runtime)
-  #   - Uncomment deploy.resources.reservations section below
-  celery-points-ml:
+  # ---- Celery olmOCR-2 worker (table extraction only) ---------------------
+  celery-olmocr2-ml:
     <<: *django-service
-    command: bash /code/docker/django/start_points_worker.sh
-    environment:
-      - POINTS_USE_GPU=true  # MUST be true - CPU not supported
-    # Uncomment for GPU reservations in production:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-    #     limits:
-    #       memory: 8G
+    command: celery -A server worker -l INFO -Q table_extraction --concurrency=1 --prefetch-multiplier=1
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -119,9 +96,14 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 30s
-    profiles:
-      - with-gpu  # Only start with: docker-compose --profile with-gpu up
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   # ---- Celery beat (scheduler) --------------------------------------------
   celery-beat:
@@ -130,6 +112,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
 
 ###############################################################################
 # Shared Docker objects

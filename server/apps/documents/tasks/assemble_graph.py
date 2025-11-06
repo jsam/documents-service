@@ -5,10 +5,10 @@ from django.utils import timezone
 
 from server.apps.documents.models import DocumentJob, ProcessingStep
 from server.apps.documents.utils.minio_client import upload_file
-from server.apps.documents.utils.storage import get_step5_graph_path
+from server.apps.documents.utils.storage import get_graph_path
 
 
-def execute_step5(job_id: str, celery_task_id: str) -> dict:
+def execute_assemble_graph(job_id: str, celery_task_id: str) -> dict:
     job = DocumentJob.objects.get(id=UUID(job_id))
     step = ProcessingStep.objects.get(job=job, step_name='ASSEMBLE_GRAPH')
     
@@ -29,7 +29,7 @@ def execute_step5(job_id: str, celery_task_id: str) -> dict:
                     'elements': [],
                 }
             
-            pages[page_num]['elements'].append({
+            element_data = {
                 'element_id': element.id,
                 'sequence': element.sequence,
                 'element_type': element.element_type,
@@ -42,7 +42,16 @@ def execute_step5(job_id: str, celery_task_id: str) -> dict:
                 'confidence': element.confidence,
                 'extracted_text': element.extracted_text,
                 'minio_image_key': element.minio_image_key,
-            })
+            }
+            
+            # Add table structure if this is a table element
+            if element.element_type == 'table':
+                if element.table_data:
+                    element_data['table_data'] = element.table_data
+                if element.table_html:
+                    element_data['table_html'] = element.table_html
+            
+            pages[page_num]['elements'].append(element_data)
         
         document_graph = {
             'job_id': str(job.id),
@@ -55,7 +64,7 @@ def execute_step5(job_id: str, celery_task_id: str) -> dict:
         job.document_graph = document_graph
         job.save(update_fields=['document_graph'])
         
-        graph_path = get_step5_graph_path(job.id)
+        graph_path = get_graph_path(job.id)
         graph_json = json.dumps(document_graph, indent=2).encode('utf-8')
         
         upload_file(

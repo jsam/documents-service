@@ -245,3 +245,7 @@ ML_MODEL_PATH = config(
 ML_CONFIDENCE_THRESHOLD = config('ML_CONFIDENCE_THRESHOLD', default=0.25, cast=float)
 ML_IOU_THRESHOLD = config('ML_IOU_THRESHOLD', default=0.45, cast=float)
 ML_DEVICE = config('ML_DEVICE', default='cpu')
+
+OLMOCR_MODEL_NAME = config('OLMOCR_MODEL_NAME', default='allenai/olmOCR-2-7B-1025')
+OLMOCR_DEVICE = config('OLMOCR_DEVICE', default='cuda' if config('ML_DEVICE', default='cpu') == 'cuda' else 'cpu')
+

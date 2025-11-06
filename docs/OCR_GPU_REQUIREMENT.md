@@ -1,8 +1,8 @@
-# POINTS OCR GPU Requirement
+# DeepSeek OCR GPU Requirement
 
 ## Overview
 
-The POINTS-Reader OCR step (`step6_points_ocr`) **requires GPU/CUDA support** and cannot run on CPU-only environments.
+The DeepSeek OCR step (`step6_ocr_processing`) **requires GPU/CUDA support** and cannot run on CPU-only environments.
 
 ## Technical Details
 
@@ -65,7 +65,7 @@ docker-compose -f docker-compose.app.yml --profile with-gpu up -d
 ```yaml
 celery-points-ml:
   environment:
-    - POINTS_USE_GPU=true
+    - DEEPSEEK_USE_GPU=true
   deploy:
     resources:
       reservations:
@@ -99,10 +99,10 @@ You should see:
 
 ## Error Handling
 
-If POINTS_USE_GPU=false (CPU mode), the worker will immediately fail with a clear error message:
+If DEEPSEEK_USE_GPU=false (CPU mode), the worker will immediately fail with a clear error message:
 
 ```
-RuntimeError: POINTS OCR requires GPU. Set POINTS_USE_GPU=true in production with CUDA support.
+RuntimeError: DeepSeek OCR requires GPU. Set DEEPSEEK_USE_GPU=true in production with CUDA support.
 ```
 
 This is intentional to prevent silent failures and make the GPU requirement explicit.

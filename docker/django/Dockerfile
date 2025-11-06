@@ -85,13 +85,14 @@ RUN groupadd -g "${GID}" -r web \
 # Copy only requirements, to cache them in docker layer:
 COPY --chown=web:web ./pyproject.toml ./uv.lock /code/
 
-# Project initialization - install as root to avoid permission issues
+# Project initialization
 RUN echo "$DJANGO_ENV" \
   && uv --version \
   && uv sync \
     $(if [ "$DJANGO_ENV" = 'production' ]; then echo '--no-dev'; fi) \
   && uv pip uninstall ninja \
   && uv pip install --reinstall --no-deps django-ninja \
+  && uv pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.3/flash_attn-2.7.3+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_x86_64.whl \
   && chown -R web:web /code/.venv
 
 # This is a special case. We need to run this script as an entry point:
