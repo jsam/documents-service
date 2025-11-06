@@ -14,13 +14,6 @@ packages = ["server"]
 [tool.uv]
 package = false
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
-
-[tool.hatch.build.targets.wheel]
-packages = ["server"]
-
 
 [project]
 name = "documents-service"
