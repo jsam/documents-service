@@ -128,6 +128,9 @@ EXTRA_CHECKS = {
 # https://docs.djangoproject.com/en/4.2/ref/databases/#caveats
 DATABASES['default']['CONN_MAX_AGE'] = 0
 
+# Static files (CSS, JavaScript, Images)
+STATIC_ROOT = '.static'
+
 # Celery settings
 CELERY_RESULT_BACKEND = 'django-db'
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "amqp://guest:guest@rabbitmq:5672/")
